@@ -2,6 +2,9 @@ class Minesweeper {
     constructor( data ) {
         this.target = data.target;
         this.DOM = null;
+        this.DOMcounter = null;
+        this.DOMclock = null;
+        this.DOMgameStatus = null;
         this.DOMsize = {
             width: 0,
             height: 0
@@ -21,7 +24,10 @@ class Minesweeper {
         this.bombRatio = data.bombsRatio || 0.1;
         this.bombCount = 1;
         this.bombList = [];
+        this.openedCellsList = [];
         this.canIplay = true;
+        this.clock = null;
+        this.clockTime = 0;
 
         this.clickCounter = 0;
 
@@ -37,7 +43,11 @@ class Minesweeper {
         this.DOM.classList.add('minesweeper');
 
         this.DOM.innerHTML = `
-            <div class="header">HEADER</div>
+            <div class="header">
+                <div id="bombs" class="counter"></div>
+                <div class="btn">:)</div>
+                <div id="clock" class="counter">000</div>
+            </div>
             <div class="board">BOARD</div>`;
 
         const DOMstyle = getComputedStyle(this.DOM);
@@ -46,12 +56,32 @@ class Minesweeper {
             height: parseInt(DOMstyle.height)
         }
         
+        this.DOMcounter = this.DOM.querySelector('#bombs');
+        this.DOMclock = this.DOM.querySelector('#clock');
+        this.DOMgameStatus = this.DOM.querySelector('.btn');
+        
         this.validateBoardSize();
         this.updateBombCount();
         this.updateGameSize();
         this.renderCells();
 
-        console.log(this);
+        this.DOMcounter.textContent = this.bombCount;
+
+        this.DOMgameStatus.addEventListener('click', () => this.resetGame());
+    }
+
+    resetGame() {
+        this.DOM = null;
+        this.DOMcounter = null;
+        this.DOMclock = null;
+        this.DOMgameStatus = null;
+        this.bombList = [];
+        this.openedCellsList = [];
+        this.canIplay = true;
+
+        this.clickCounter = 0;
+
+        this.init();
     }
 
     validateBoardSize() {
@@ -114,12 +144,19 @@ class Minesweeper {
         this.DOMcells = this.DOMboard.querySelectorAll('.cell');
         for ( let i=0; i<size; i++ ) {
             const cell = this.DOMcells[i];
-            cell.addEventListener('click', (event) => this.openCell(event, i));
+            cell.addEventListener('click', () => this.openCell(i));
+            cell.addEventListener('contextmenu', (ev) => this.toggleFlag(ev, i));
         }
     }
 
-    openCell( event, index ) {
-        if ( !this.canIplay ) {
+    toggleFlag( ev, index ) {
+        ev.preventDefault();
+        this.DOMcells[index].classList.toggle('flag');
+    }
+
+    openCell( index ) {
+        if ( !this.canIplay ||
+             this.DOMcells[index].classList.contains('flag') ) {
             return;
         }
 
@@ -131,13 +168,27 @@ class Minesweeper {
 
         if ( this.clickCounter === 1 ) {
             this.generateBombs( coord );
+
+            this.clock = setInterval(() => {
+                this.clockTime++;
+                this.DOMclock.textContent = this.clockTime;
+            }, 1000);
         }
 
         this.DOMcells[index].classList.add('open');
+        this.openedCellsList.push(index);
+
+        // patikriname ar laimejome
+        if ( this.openedCellsList.length + this.bombCount === this.boardSize.columns * this.boardSize.rows ) {
+            this.DOMgameStatus.textContent = 'B)';
+            clearInterval(this.clock);
+        }
 
         if ( this.bombList.indexOf(index) >= 0 ) {
             this.canIplay = false;
             this.DOMcells[index].classList.add('failure');
+            this.DOMgameStatus.textContent = ':(';
+            clearInterval(this.clock);
         } else {
             let count = 0;
             let searchIndex = 0;
@@ -156,20 +207,22 @@ class Minesweeper {
                 }
             }
             // jei aplinkui yra bombu, tai i ta cele irasyti ju kieki
-            this.DOMcells[index].textContent = count;
+            this.DOMcells[index].textContent = count > 0 ? count : '';
             
-            // console.log('- atidarau ir aplinkines celles, kol galiu');
-
-            for ( let x=-1; x<=1; x++ ) {
-                for ( let y=-1; y<=1; y++ ) {
-                    if ( coord.x+x < 0 ||
-                         coord.x+x >= this.boardSize.columns ||
-                         coord.y+y < 0 ||
-                         coord.y+y >= this.boardSize.rows ) {
-                        continue;
+            // atidarau ir aplinkines celles, kol galiu
+            if ( count === 0 ) {
+                for ( let x=-1; x<=1; x++ ) {
+                    for ( let y=-1; y<=1; y++ ) {
+                        searchIndex = coord.x+x + (coord.y+y) * this.boardSize.columns;
+                        if ( coord.x+x < 0 ||
+                             coord.x+x >= this.boardSize.columns ||
+                             coord.y+y < 0 ||
+                             coord.y+y >= this.boardSize.rows ||
+                             this.openedCellsList.indexOf(searchIndex) >= 0 ) {
+                            continue;
+                        }
+                        this.openCell( searchIndex );
                     }
-                    searchIndex = coord.x+x + (coord.y+y) * this.boardSize.columns;
-                    // ????
                 }
             }
         }
