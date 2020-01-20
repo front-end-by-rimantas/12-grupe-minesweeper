@@ -20,6 +20,8 @@ class Minesweeper {
         }
         this.bombRatio = data.bombsRatio || 0.1;
         this.bombCount = 1;
+        this.bombList = [];
+        this.canIplay = true;
 
         this.clickCounter = 0;
 
@@ -73,15 +75,16 @@ class Minesweeper {
     }
 
     updateBombCount() {
-        this.bombCount = Math.round(this.bombRatio * this.boardSize.columns * this.boardSize.rows);
+        const boardSize = this.boardSize.columns * this.boardSize.rows;
+        this.bombCount = Math.round(this.bombRatio * boardSize);
         // turi buti ne maziau 1
         if ( this.bombCount < 1 ) {
             this.bombCount = 1;
         }
         
         // turi buti ne daugiau (lentosDydis - 1)
-        if ( this.bombCount >= this.boardSize.columns * this.boardSize.rows ) {
-            this.bombCount = this.boardSize.columns * this.boardSize.rows - 1;
+        if ( this.bombCount >= boardSize ) {
+            this.bombCount = boardSize - 1;
         }
 
     }
@@ -111,26 +114,87 @@ class Minesweeper {
         this.DOMcells = this.DOMboard.querySelectorAll('.cell');
         for ( let i=0; i<size; i++ ) {
             const cell = this.DOMcells[i];
-            cell.addEventListener('click', (event) => {
-                return this.openCell(event);
-            });
+            cell.addEventListener('click', (event) => this.openCell(event, i));
         }
     }
 
-    openCell( event ) {
-        this.clickCounter++;
-
-        console.log('- issiaiskinu paspaustos celles koordinates');
-
-        // console.log('cell click...');
-        if ( this.clickCounter === 1 ) {
-            console.log('- sugeneruoju bombas');
+    openCell( event, index ) {
+        if ( !this.canIplay ) {
+            return;
         }
 
-        console.log('- atidarau paspausta celle');
-        console.log('tikrinu:');
-            console.log('- jei uzsiroviau ant bombos - FINNITO');
-            console.log('- atidarau ir aplinkines celles, kol galiu');
+        this.clickCounter++;
+        let coord = {
+            x: index % this.boardSize.columns,
+            y: Math.floor(index / this.boardSize.columns)
+        }
+
+        if ( this.clickCounter === 1 ) {
+            this.generateBombs( coord );
+        }
+
+        this.DOMcells[index].classList.add('open');
+
+        if ( this.bombList.indexOf(index) >= 0 ) {
+            this.canIplay = false;
+            this.DOMcells[index].classList.add('failure');
+        } else {
+            let count = 0;
+            let searchIndex = 0;
+            for ( let x=-1; x<=1; x++ ) {
+                for ( let y=-1; y<=1; y++ ) {
+                    if ( coord.x+x < 0 ||
+                         coord.x+x >= this.boardSize.columns ||
+                         coord.y+y < 0 ||
+                         coord.y+y >= this.boardSize.rows ) {
+                        continue;
+                    }
+                    searchIndex = coord.x+x + (coord.y+y) * this.boardSize.columns;
+                    if ( this.bombList.indexOf(searchIndex) >= 0 ) {
+                        count++;
+                    }
+                }
+            }
+            // jei aplinkui yra bombu, tai i ta cele irasyti ju kieki
+            this.DOMcells[index].textContent = count;
+            
+            // console.log('- atidarau ir aplinkines celles, kol galiu');
+
+            for ( let x=-1; x<=1; x++ ) {
+                for ( let y=-1; y<=1; y++ ) {
+                    if ( coord.x+x < 0 ||
+                         coord.x+x >= this.boardSize.columns ||
+                         coord.y+y < 0 ||
+                         coord.y+y >= this.boardSize.rows ) {
+                        continue;
+                    }
+                    searchIndex = coord.x+x + (coord.y+y) * this.boardSize.columns;
+                    // ????
+                }
+            }
+        }
+    }
+
+    generateBombs( coord ) {
+        console.log('- sugeneruoju bombas', coord, this.bombCount);
+        const boardSize = this.boardSize.columns * this.boardSize.rows;
+        const myCellIndex = coord.x + coord.y * this.boardSize.columns;
+        let bombCellIndex = 0;
+
+        for ( let i=0; i<this.bombCount; i++ ) {
+            bombCellIndex = Math.floor( Math.random() * boardSize );
+            if ( bombCellIndex !== myCellIndex &&
+                 this.bombList.indexOf(bombCellIndex) === -1 ) {
+                // this.DOMcells[bombCellIndex].textContent = 'B';
+                this.DOMcells[bombCellIndex].textContent = '';
+                this.bombList.push(bombCellIndex);
+            } else {
+                i--;
+            }
+        }
+
+        console.log(this.bombList);
+        
     }
 }
 
